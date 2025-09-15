@@ -23,7 +23,7 @@ import { summarizeLecture } from "@/ai/flows/summarize-uploaded-lectures";
 import { transcribeLecture } from "@/ai/flows/transcribe-uploaded-lectures";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "../ui/input";
-import { getSubjects, updateSubjectData } from "@/lib/data";
+import { addContent, updateContent } from "@/lib/data";
 import { useRouter } from "next/navigation";
 import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
 
@@ -57,81 +57,40 @@ export function LectureList({ initialLectures, subjectId, chapterId }: LectureLi
         URL.revokeObjectURL(a.href);
     }
   };
-
-  const updateLectureInState = (lectureId: string, updatedProps: Partial<Content>) => {
-    const allSubjects = getSubjects();
-    const subjectIndex = allSubjects.findIndex(s => s.id === subjectId);
-    if (subjectIndex === -1) return;
-
-    const findAndupdate = (chapters: any[]) => {
-        for(const chapter of chapters) {
-            if (chapter.id === chapterId) {
-                const lectureIndex = chapter.lectures.findIndex((l: any) => l.id === lectureId);
-                if(lectureIndex !== -1) {
-                    const currentLecture = chapter.lectures[lectureIndex];
-                    chapter.lectures[lectureIndex] = { ...currentLecture, ...updatedProps };
-                    // If we update dataUri, we might not need the URL object anymore
-                    if (updatedProps.dataUri && currentLecture.url.startsWith('blob:')) {
-                        URL.revokeObjectURL(currentLecture.url);
-                        chapter.lectures[lectureIndex].url = '#'; // Or some placeholder
-                    }
-                    return true;
-                }
-            }
-            if(chapter.children) {
-                if(findAndupdate(chapter.children)) return true;
-            }
-        }
-        return false;
-    }
-    
-    findAndupdate(allSubjects[subjectIndex].chapters);
-    updateSubjectData(allSubjects);
-    setLectures(prev => prev.map(l => l.id === lectureId ? { ...l, ...updatedProps } : l));
-    router.refresh();
-  };
-
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       const dataUri = e.target?.result as string;
       const fileType = file.type.startsWith("video") ? "video" : "audio";
-      const newLecture: Content = {
-        id: `lec-${Date.now()}`,
+      
+      const newLectureData: Omit<Content, 'id'> = {
         title: file.name,
         type: fileType,
         url: '#', // Not using blob url anymore for persistence
         dataUri: dataUri,
       };
-      
-      const allSubjects = getSubjects();
-      const subjectIndex = allSubjects.findIndex(s => s.id === subjectId);
-      if (subjectIndex === -1) return;
 
-      const findAndAdd = (chapters: any[]) => {
-          for(const chapter of chapters) {
-              if (chapter.id === chapterId) {
-                  chapter.lectures.push(newLecture);
-                  return true;
-              }
-              if(chapter.children) {
-                  if(findAndAdd(chapter.children)) return true;
-              }
-          }
-          return false;
+      try {
+        const newLecture = await addContent(subjectId, chapterId, "lectures", newLectureData);
+        setLectures((prev) => [...prev, newLecture]);
+        router.refresh();
+
+        toast({
+          title: "Lecture Uploaded",
+          description: `"${file.name}" has been added and saved.`,
+        });
+      } catch (error) {
+        console.error("Failed to upload lecture", error);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to upload lecture.",
+        });
       }
-      findAndAdd(allSubjects[subjectIndex].chapters)
-      updateSubjectData(allSubjects)
-      setLectures((prev) => [...prev, newLecture]);
-      router.refresh();
-
-      toast({
-        title: "Lecture Uploaded",
-        description: `"${file.name}" has been added and saved for offline access.`,
-      });
     };
     reader.readAsDataURL(file);
 
@@ -144,7 +103,8 @@ export function LectureList({ initialLectures, subjectId, chapterId }: LectureLi
     setLoadingStates(prev => ({ ...prev, [lectureId]: 'summarize' }));
     try {
       const result = await summarizeLecture({ videoDataUri: dataUri });
-      updateLectureInState(lectureId, { summary: result.summary });
+      await updateContent(subjectId, chapterId, "lectures", lectureId, { summary: result.summary });
+      setLectures(prev => prev.map(l => l.id === lectureId ? { ...l, summary: result.summary } : l));
       toast({
         title: "Summary Generated",
         description: "AI-powered summary has been created for the lecture.",
@@ -165,7 +125,8 @@ export function LectureList({ initialLectures, subjectId, chapterId }: LectureLi
     setLoadingStates(prev => ({ ...prev, [lectureId]: 'transcribe' }));
     try {
       const result = await transcribeLecture({ audioDataUri: dataUri });
-      updateLectureInState(lectureId, { transcription: result.transcription });
+      await updateContent(subjectId, chapterId, "lectures", lectureId, { transcription: result.transcription });
+      setLectures(prev => prev.map(l => l.id === lectureId ? { ...l, transcription: result.transcription } : l));
       toast({
         title: "Transcription Complete",
         description: "The lecture has been transcribed to text.",

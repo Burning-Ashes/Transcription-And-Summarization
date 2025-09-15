@@ -3,8 +3,8 @@ import { AppLayout } from "@/components/layout/app-layout";
 import { SubjectList } from "@/components/dashboard/subject-list";
 import { getSubjects } from "@/lib/data";
 
-export default function Home() {
-  const subjects = getSubjects();
+export default async function Home() {
+  const subjects = await getSubjects();
   return (
     <AppLayout>
       <div className="flex flex-col gap-4 p-4 sm:p-6 lg:p-8">

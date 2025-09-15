@@ -21,7 +21,7 @@ import {
 import { generateStudyMaterialSummary } from "@/ai/flows/generate-study-material-summaries";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "../ui/input";
-import { getSubjects, updateSubjectData } from "@/lib/data";
+import { addContent, updateContent } from "@/lib/data";
 import { useRouter } from "next/navigation";
 import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
 
@@ -56,48 +56,14 @@ export function MaterialList({ initialMaterials, subjectId, chapterId }: Materia
     }
   };
 
-  const updateMaterialInState = (materialId: string, updatedProps: Partial<Content>) => {
-    const allSubjects = getSubjects();
-    const subjectIndex = allSubjects.findIndex(s => s.id === subjectId);
-    if (subjectIndex === -1) return;
-
-    const findAndupdate = (chapters: any[]) => {
-        for(const chapter of chapters) {
-            if (chapter.id === chapterId) {
-                const materialIndex = chapter.materials.findIndex((m: any) => m.id === materialId);
-                if(materialIndex !== -1) {
-                    const currentMaterial = chapter.materials[materialIndex];
-                    chapter.materials[materialIndex] = { ...currentMaterial, ...updatedProps };
-                    // If we update dataUri, we might not need the URL object anymore
-                    if (updatedProps.dataUri && currentMaterial.url.startsWith('blob:')) {
-                        URL.revokeObjectURL(currentMaterial.url);
-                        chapter.materials[materialIndex].url = '#';
-                    }
-                    return true;
-                }
-            }
-            if(chapter.children) {
-                if(findAndupdate(chapter.children)) return true;
-            }
-        }
-        return false;
-    }
-    
-    findAndupdate(allSubjects[subjectIndex].chapters);
-    updateSubjectData(allSubjects);
-    setMaterials(prev => prev.map(m => m.id === materialId ? { ...m, ...updatedProps } : m));
-    router.refresh();
-  };
-
-
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       const dataUri = e.target?.result as string;
-      const newMaterial: Content = {
+      const newMaterialData: Omit<Content, "id"> = {
         id: `mat-${Date.now()}`,
         title: file.name,
         type: file.type === "application/pdf" ? "pdf" : "text",
@@ -105,32 +71,23 @@ export function MaterialList({ initialMaterials, subjectId, chapterId }: Materia
         dataUri: dataUri,
       };
 
-      const allSubjects = getSubjects();
-      const subjectIndex = allSubjects.findIndex(s => s.id === subjectId);
-      if (subjectIndex === -1) return;
+      try {
+        const newMaterial = await addContent(subjectId, chapterId, "materials", newMaterialData)
+        setMaterials((prev) => [...prev, newMaterial]);
+        router.refresh();
 
-      const findAndAdd = (chapters: any[]) => {
-        for(const chapter of chapters) {
-            if (chapter.id === chapterId) {
-                chapter.materials.push(newMaterial);
-                return true;
-            }
-            if(chapter.children) {
-                if(findAndAdd(chapter.children)) return true;
-            }
-        }
-        return false;
+        toast({
+          title: "Material Uploaded",
+          description: `"${file.name}" has been added and saved.`,
+        });
+      } catch(error) {
+        console.error("Failed to upload material", error);
+        toast({
+            variant: "destructive",
+            title: "Error",
+            description: "Failed to upload material."
+        })
       }
-      findAndAdd(allSubjects[subjectIndex].chapters)
-      updateSubjectData(allSubjects)
-
-      setMaterials((prev) => [...prev, newMaterial]);
-      router.refresh();
-
-      toast({
-        title: "Material Uploaded",
-        description: `"${file.name}" has been added and saved for offline access.`,
-      });
     };
     reader.readAsDataURL(file);
 
@@ -143,7 +100,8 @@ export function MaterialList({ initialMaterials, subjectId, chapterId }: Materia
     setLoadingStates(prev => ({ ...prev, [materialId]: true }));
     try {
       const result = await generateStudyMaterialSummary({ materialDataUri: dataUri });
-      updateMaterialInState(materialId, { summary: result.summary });
+      await updateContent(subjectId, chapterId, "materials", materialId, { summary: result.summary });
+      setMaterials(prev => prev.map(m => m.id === materialId ? { ...m, summary: result.summary } : m));
       toast({
         title: "Summary Generated",
         description: "AI-powered summary has been created for the material.",

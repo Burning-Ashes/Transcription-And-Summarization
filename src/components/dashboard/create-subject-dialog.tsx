@@ -52,16 +52,25 @@ export function CreateSubjectDialog({ children, open, onOpenChange }: CreateSubj
     },
   });
 
-  function onSubmit(values: z.infer<typeof formSchema>) {
-    const newSubject = addSubject(values);
-    toast({
-      title: "Subject Created",
-      description: `"${newSubject.title}" has been successfully created.`,
-    });
-    onOpenChange(false);
-    form.reset();
-    router.refresh(); 
-    router.push(`/subjects/${newSubject.id}`);
+  async function onSubmit(values: z.infer<typeof formSchema>) {
+    try {
+      const newSubject = await addSubject(values);
+      toast({
+        title: "Subject Created",
+        description: `"${newSubject.title}" has been successfully created.`,
+      });
+      onOpenChange(false);
+      form.reset();
+      router.push(`/subjects/${newSubject.id}`);
+      router.refresh(); 
+    } catch (error) {
+        console.error("Failed to create subject", error);
+        toast({
+            variant: "destructive",
+            title: "Error",
+            description: "Failed to create subject. Please try again."
+        })
+    }
   }
 
   return (

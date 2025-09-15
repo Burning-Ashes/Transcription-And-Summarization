@@ -14,7 +14,7 @@ export interface Content {
 export interface Chapter {
   id: string;
   title: string;
-  children?: Chapter[];
+  children: Chapter[];
   lectures: Content[];
   materials: Content[];
 }

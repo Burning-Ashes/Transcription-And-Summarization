@@ -4,12 +4,12 @@ import { SubjectDetails } from "@/components/subject/subject-details";
 import { getSubjectById } from "@/lib/data";
 import { notFound } from "next/navigation";
 
-export default function SubjectPage({
+export default async function SubjectPage({
   params,
 }: {
   params: { subjectId: string };
 }) {
-  const subject = getSubjectById(params.subjectId);
+  const subject = await getSubjectById(params.subjectId);
 
   if (!subject) {
     notFound();
@@ -24,7 +24,7 @@ export default function SubjectPage({
 
 // Optional: Add metadata generation
 export async function generateMetadata({ params }: { params: { subjectId: string } }) {
-    const subject = getSubjectById(params.subjectId);
+    const subject = await getSubjectById(params.subjectId);
     if (!subject) {
       return {
         title: "Subject Not Found",
