@@ -1,109 +1,103 @@
 
 import { PlaceHolderImages } from "./placeholder-images";
 import type { Subject, Chapter, Content } from "./types";
-import { db } from "./firebase";
-import {
-  collection,
-  getDocs,
-  getDoc,
-  doc,
-  addDoc,
-  updateDoc,
-  query,
-  where,
-  writeBatch,
-  documentId,
-} from "firebase/firestore";
+
+// This is a temporary in-memory store.
+// In a real application, this would be a database.
+let subjects: Subject[] = PlaceHolderImages.map(img => ({
+    id: img.id,
+    title: img.description.replace("An image representing ", ""),
+    description: `A comprehensive overview of ${img.description.replace("An image representing ", "")}.`,
+    imageUrl: img.imageUrl,
+    imageHint: img.imageHint,
+    chapters: [
+        {
+            id: 'chapter-1',
+            title: 'Introduction',
+            children: [],
+            lectures: [],
+            materials: []
+        }
+    ]
+}));
+
+// Simulate DB latency
+const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
 
 // Functions to interact with the data
 export const getSubjects = async (): Promise<Subject[]> => {
-  const subjectsCol = collection(db, "subjects");
-  const subjectSnapshot = await getDocs(subjectsCol);
-  const subjects = await Promise.all(
-    subjectSnapshot.docs.map(async (d) => {
-      const subjectData = d.data() as Omit<Subject, "id" | "chapters">;
-      const subject: Subject = {
-        ...subjectData,
-        id: d.id,
-        chapters: await getChapters(d.id),
-      };
-      return subject;
-    })
-  );
+  await delay(100);
   return subjects;
 };
 
 export const getSubjectById = async (id: string): Promise<Subject | undefined> => {
-  const subjectDocRef = doc(db, "subjects", id);
-  const subjectDoc = await getDoc(subjectDocRef);
+    await delay(50);
+    const subject = subjects.find(s => s.id === id);
+    if (!subject) return undefined;
 
-  if (!subjectDoc.exists()) {
-    return undefined;
-  }
-
-  const subjectData = subjectDoc.data() as Omit<Subject, "id" | "chapters">;
-  const subject: Subject = {
-    ...subjectData,
-    id: subjectDoc.id,
-    chapters: await getChapters(subjectDoc.id),
-  };
-  return subject;
+    // Deep copy to avoid mutation issues
+    return JSON.parse(JSON.stringify(subject));
 };
 
-const getChapters = async (subjectId: string): Promise<Chapter[]> => {
-  const chaptersCol = collection(db, "subjects", subjectId, "chapters");
-  const chapterSnapshot = await getDocs(chaptersCol);
-  
-  const chapters = await Promise.all(
-    chapterSnapshot.docs.map(async (d) => {
-      const chapterData = d.data() as Omit<Chapter, "id" | "lectures" | "materials" | "children">;
-      const chapter: Chapter = {
-        ...chapterData,
-        id: d.id,
-        lectures: await getContent(subjectId, d.id, "lectures"),
-        materials: await getContent(subjectId, d.id, "materials"),
-        children: await getChapters(`${subjectId}/chapters/${d.id}`), // Recursive call for sub-chapters
-      };
-      return chapter;
-    })
-  );
 
-  return chapters;
-};
-
-const getContent = async (subjectId: string, chapterId: string, contentType: "lectures" | "materials"): Promise<Content[]> => {
-    const contentCol = collection(db, "subjects", subjectId, "chapters", chapterId, contentType);
-    const contentSnapshot = await getDocs(contentCol);
-    return contentSnapshot.docs.map(d => ({...d.data(), id: d.id} as Content));
+const findChapterRecursive = (chapters: Chapter[], chapterId: string): Chapter | null => {
+    for (const chapter of chapters) {
+        if (chapter.id === chapterId) {
+            return chapter;
+        }
+        if (chapter.children) {
+            const found = findChapterRecursive(chapter.children, chapterId);
+            if (found) return found;
+        }
+    }
+    return null;
 }
 
 export const addSubject = async (subject: Omit<Subject, 'id' | 'chapters' | 'imageUrl' | 'imageHint'>) => {
-  const randomImage = PlaceHolderImages[Math.floor(Math.random() * PlaceHolderImages.length)];
-  const newSubjectData = {
-    ...subject,
-    imageUrl: randomImage.imageUrl,
-    imageHint: randomImage.imageHint,
+    await delay(200);
+    const randomImage = PlaceHolderImages[Math.floor(Math.random() * PlaceHolderImages.length)];
+    const newSubject: Subject = {
+      ...subject,
+      id: `subj-${Date.now()}`,
+      imageUrl: randomImage.imageUrl,
+      imageHint: randomImage.imageHint,
+      chapters: [
+        {
+          id: `chap-${Date.now()}`,
+          title: 'Introduction',
+          children: [],
+          lectures: [],
+          materials: []
+        }
+      ]
+    };
+    subjects.push(newSubject);
+    return newSubject;
   };
   
-  const subjectsCol = collection(db, 'subjects');
-  const docRef = await addDoc(subjectsCol, newSubjectData);
-  
-  const newSubject: Subject = {
-      ...newSubjectData,
-      id: docRef.id,
-      chapters: []
-  }
-
-  return newSubject;
-};
-
 export const addContent = async (subjectId: string, chapterId: string, contentType: "lectures" | "materials", content: Omit<Content, 'id'>) => {
-    const contentCol = collection(db, "subjects", subjectId, "chapters", chapterId, contentType);
-    const docRef = await addDoc(contentCol, content);
-    return { ...content, id: docRef.id };
+    await delay(150);
+    const subject = subjects.find(s => s.id === subjectId);
+    if (!subject) throw new Error("Subject not found");
+
+    const chapter = findChapterRecursive(subject.chapters, chapterId);
+    if (!chapter) throw new Error("Chapter not found");
+    
+    const newContent = { ...content, id: `content-${Date.now()}` };
+    chapter[contentType].push(newContent);
+    return newContent;
 };
 
 export const updateContent = async (subjectId: string, chapterId: string, contentType: "lectures" | "materials", contentId: string, updatedProps: Partial<Content>) => {
-    const contentDocRef = doc(db, "subjects", subjectId, "chapters", chapterId, contentType, contentId);
-    await updateDoc(contentDocRef, updatedProps);
+    await delay(100);
+    const subject = subjects.find(s => s.id === subjectId);
+    if (!subject) throw new Error("Subject not found");
+
+    const chapter = findChapterRecursive(subject.chapters, chapterId);
+    if (!chapter) throw new Error("Chapter not found");
+
+    const contentIndex = chapter[contentType].findIndex(c => c.id === contentId);
+    if (contentIndex === -1) throw new Error("Content not found");
+
+    chapter[contentType][contentIndex] = { ...chapter[contentType][contentIndex], ...updatedProps };
 };
