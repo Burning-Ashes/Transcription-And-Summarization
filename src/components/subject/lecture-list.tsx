@@ -1,16 +1,13 @@
-
 "use client";
-import React, { useState, useTransition } from "react";
-import type { Content, Subject } from "@/lib/types";
+import React, { useState } from "react";
+import type { Content } from "@/lib/types";
 import { useUser } from "@/hooks/use-user";
 import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
-  CardFooter,
 } from "@/components/ui/card";
 import {
   FileText,
@@ -19,6 +16,7 @@ import {
   PlusCircle,
   Sparkles,
   Video,
+  Download,
 } from "lucide-react";
 import { summarizeLecture } from "@/ai/flows/summarize-uploaded-lectures";
 import { transcribeLecture } from "@/ai/flows/transcribe-uploaded-lectures";
@@ -27,7 +25,6 @@ import { Input } from "../ui/input";
 import { getSubjects, updateSubjectData } from "@/lib/data";
 import { useRouter } from "next/navigation";
 import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
-import { Separator } from "../ui/separator";
 
 interface LectureListProps {
   initialLectures: Content[];
@@ -42,6 +39,18 @@ export function LectureList({ initialLectures, subjectId, chapterId }: LectureLi
   const { toast } = useToast();
   const router = useRouter();
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const handleDownload = (content: string, fileName: string) => {
+    const blob = new Blob([content], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
 
   const updateLectureInState = (lectureId: string, updatedProps: Partial<Content>) => {
     const allSubjects = getSubjects();
@@ -220,7 +229,17 @@ export function LectureList({ initialLectures, subjectId, chapterId }: LectureLi
                   {lecture.summary && (
                      <Alert>
                         <Sparkles className="h-4 w-4" />
-                       <AlertTitle>AI Summary</AlertTitle>
+                       <AlertTitle className="flex items-center justify-between">
+                         AI Summary
+                         <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={() => handleDownload(lecture.summary!, `${lecture.title}-summary.txt`)}
+                         >
+                            <Download className="h-4 w-4" />
+                         </Button>
+                       </AlertTitle>
                        <AlertDescription>
                          {lecture.summary}
                        </AlertDescription>
@@ -229,7 +248,17 @@ export function LectureList({ initialLectures, subjectId, chapterId }: LectureLi
                   {lecture.transcription && (
                     <Alert>
                         <FileText className="h-4 w-4" />
-                      <AlertTitle>Transcription</AlertTitle>
+                      <AlertTitle className="flex items-center justify-between">
+                        Transcription
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={() => handleDownload(lecture.transcription!, `${lecture.title}-transcription.txt`)}
+                        >
+                            <Download className="h-4 w-4" />
+                        </Button>
+                      </AlertTitle>
                       <AlertDescription className="max-h-48 overflow-y-auto">
                         {lecture.transcription}
                       </AlertDescription>

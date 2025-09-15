@@ -1,4 +1,3 @@
-
 "use client";
 import React, { useState } from "react";
 import type { Content } from "@/lib/types";
@@ -16,6 +15,7 @@ import {
   PlusCircle,
   Sparkles,
   BookOpen,
+  Download,
 } from "lucide-react";
 import { generateStudyMaterialSummary } from "@/ai/flows/generate-study-material-summaries";
 import { useToast } from "@/hooks/use-toast";
@@ -37,6 +37,18 @@ export function MaterialList({ initialMaterials, subjectId, chapterId }: Materia
   const { toast } = useToast();
   const router = useRouter();
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const handleDownload = (content: string, fileName: string) => {
+    const blob = new Blob([content], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
 
   const updateMaterialInState = (materialId: string, updatedProps: Partial<Content>) => {
     const allSubjects = getSubjects();
@@ -182,7 +194,17 @@ export function MaterialList({ initialMaterials, subjectId, chapterId }: Materia
                 <CardContent>
                   <Alert>
                     <Sparkles className="h-4 w-4" />
-                    <AlertTitle>AI Summary</AlertTitle>
+                    <AlertTitle className="flex items-center justify-between">
+                      AI Summary
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={() => handleDownload(material.summary!, `${material.title}-summary.txt`)}
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
+                    </AlertTitle>
                     <AlertDescription>{material.summary}</AlertDescription>
                   </Alert>
                 </CardContent>
