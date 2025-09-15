@@ -1,6 +1,6 @@
 
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
+import { getFirestore, initializeFirestore, persistentLocalCache, memoryLocalCache } from "firebase/firestore";
 
 const firebaseConfig = {
   "projectId": "studio-4288700189-446d2",
@@ -14,6 +14,13 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
-const db = getFirestore(app);
+
+// Initialize Firestore with offline persistence
+const db = initializeFirestore(app, {
+  localCache: typeof window === 'undefined' 
+    ? memoryLocalCache() 
+    : persistentLocalCache({ tabManager: 'primary' })
+});
+
 
 export { db };
