@@ -19,7 +19,7 @@ const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 const db = initializeFirestore(app, {
   localCache: typeof window === 'undefined' 
     ? memoryLocalCache() 
-    : persistentLocalCache({ tabManager: 'primary' })
+    : persistentLocalCache({})
 });
 
 
