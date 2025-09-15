@@ -1,3 +1,41 @@
+
 {
-  "placeholderImages": []
+  "placeholderImages": [
+    {
+      "id": "subject-math",
+      "description": "An image representing mathematics",
+      "imageUrl": "https://picsum.photos/seed/math/600/400",
+      "imageHint": "mathematics geometry"
+    },
+    {
+      "id": "subject-history",
+      "description": "An image representing history",
+      "imageUrl": "https://picsum.photos/seed/history/600/400",
+      "imageHint": "history ancient"
+    },
+    {
+      "id": "subject-science",
+      "description": "An image representing science",
+      "imageUrl": "https://picsum.photos/seed/science/600/400",
+      "imageHint": "science chemistry"
+    },
+    {
+      "id": "subject-art",
+      "description": "An image representing art",
+      "imageUrl": "https://picsum.photos/seed/art/600/400",
+      "imageHint": "art painting"
+    },
+    {
+      "id": "subject-literature",
+      "description": "An image representing literature",
+      "imageUrl": "https://picsum.photos/seed/literature/600/400",
+      "imageHint": "literature books"
+    },
+    {
+      "id": "subject-geography",
+      "description": "An image representing geography",
+      "imageUrl": "https://picsum.photos/seed/geography/600/400",
+      "imageHint": "geography map"
+    }
+  ]
 }
