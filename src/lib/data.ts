@@ -2,7 +2,7 @@
 import { PlaceHolderImages } from "./placeholder-images";
 import type { Subject } from "./types";
 
-let subjects: Subject[] = [
+const initialSubjects: Subject[] = [
   {
     id: "math-101",
     title: "Mathematics 101",
@@ -83,12 +83,38 @@ let subjects: Subject[] = [
   },
 ];
 
-// Functions to interact with the mock data
+const STORAGE_KEY = 'study-hub-subjects';
+
+const isBrowser = typeof window !== 'undefined';
+
+// Functions to interact with the data
 export const getSubjects = (): Subject[] => {
-  return subjects;
+  if (!isBrowser) return initialSubjects;
+  try {
+    const storedSubjects = localStorage.getItem(STORAGE_KEY);
+    if (storedSubjects) {
+      return JSON.parse(storedSubjects);
+    } else {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(initialSubjects));
+      return initialSubjects;
+    }
+  } catch (error) {
+    console.error("Failed to read from localStorage", error);
+    return initialSubjects;
+  }
+};
+
+export const updateSubjectData = (newSubjects: Subject[]) => {
+  if (!isBrowser) return;
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(newSubjects));
+  } catch (error) {
+    console.error("Failed to write to localStorage", error);
+  }
 };
 
 export const getSubjectById = (id: string): Subject | undefined => {
+  const subjects = getSubjects();
   return subjects.find((s) => s.id === id);
 };
 
@@ -101,12 +127,8 @@ export const addSubject = (subject: Omit<Subject, 'id' | 'chapters' | 'imageUrl'
     imageHint: randomImage.imageHint,
     chapters: [],
   };
+  const subjects = getSubjects();
   subjects.push(newSubject);
+  updateSubjectData(subjects);
   return newSubject;
 };
-
-// This is a client-side only function to simulate DB updates.
-// In a real app, this would be an API call and server-side logic.
-export const updateSubjectData = (newSubjects: Subject[]) => {
-  subjects = newSubjects;
-}

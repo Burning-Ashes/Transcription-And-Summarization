@@ -1,3 +1,4 @@
+
 "use client";
 import React, { useState } from "react";
 import type { Content } from "@/lib/types";
@@ -38,16 +39,21 @@ export function MaterialList({ initialMaterials, subjectId, chapterId }: Materia
   const router = useRouter();
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-  const handleDownload = (content: string, fileName: string) => {
-    const blob = new Blob([content], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
+  const handleDownload = (content: string, fileName: string, isDataUri = false) => {
     const a = document.createElement("a");
-    a.href = url;
+    if (isDataUri) {
+        a.href = content;
+    } else {
+        const blob = new Blob([content], { type: "text/plain" });
+        a.href = URL.createObjectURL(blob);
+    }
     a.download = fileName;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    if (!isDataUri) {
+        URL.revokeObjectURL(a.href);
+    }
   };
 
   const updateMaterialInState = (materialId: string, updatedProps: Partial<Content>) => {
@@ -60,7 +66,13 @@ export function MaterialList({ initialMaterials, subjectId, chapterId }: Materia
             if (chapter.id === chapterId) {
                 const materialIndex = chapter.materials.findIndex((m: any) => m.id === materialId);
                 if(materialIndex !== -1) {
-                    chapter.materials[materialIndex] = { ...chapter.materials[materialIndex], ...updatedProps };
+                    const currentMaterial = chapter.materials[materialIndex];
+                    chapter.materials[materialIndex] = { ...currentMaterial, ...updatedProps };
+                    // If we update dataUri, we might not need the URL object anymore
+                    if (updatedProps.dataUri && currentMaterial.url.startsWith('blob:')) {
+                        URL.revokeObjectURL(currentMaterial.url);
+                        chapter.materials[materialIndex].url = '#';
+                    }
                     return true;
                 }
             }
@@ -74,6 +86,7 @@ export function MaterialList({ initialMaterials, subjectId, chapterId }: Materia
     findAndupdate(allSubjects[subjectIndex].chapters);
     updateSubjectData(allSubjects);
     setMaterials(prev => prev.map(m => m.id === materialId ? { ...m, ...updatedProps } : m));
+    router.refresh();
   };
 
 
@@ -88,7 +101,7 @@ export function MaterialList({ initialMaterials, subjectId, chapterId }: Materia
         id: `mat-${Date.now()}`,
         title: file.name,
         type: file.type === "application/pdf" ? "pdf" : "text",
-        url: URL.createObjectURL(file),
+        url: '#',
         dataUri: dataUri,
       };
 
@@ -112,9 +125,11 @@ export function MaterialList({ initialMaterials, subjectId, chapterId }: Materia
       updateSubjectData(allSubjects)
 
       setMaterials((prev) => [...prev, newMaterial]);
+      router.refresh();
+
       toast({
         title: "Material Uploaded",
-        description: `"${file.name}" has been added.`,
+        description: `"${file.name}" has been added and saved for offline access.`,
       });
     };
     reader.readAsDataURL(file);
@@ -177,17 +192,29 @@ export function MaterialList({ initialMaterials, subjectId, chapterId }: Materia
                     <FileText className="h-6 w-6 text-primary" />
                     <CardTitle>{material.title}</CardTitle>
                   </div>
-                  {isTeacher && material.dataUri && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleSummarize(material.id, material.dataUri!)}
-                      disabled={loadingStates[material.id]}
-                    >
-                      {loadingStates[material.id] ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-                      Summarize
-                    </Button>
-                  )}
+                    <div className="flex gap-2 flex-shrink-0">
+                        {isTeacher && material.dataUri && (
+                            <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleSummarize(material.id, material.dataUri!)}
+                            disabled={loadingStates[material.id]}
+                            >
+                            {loadingStates[material.id] ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+                            Summarize
+                            </Button>
+                        )}
+                        {material.dataUri && (
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleDownload(material.dataUri!, material.title, true)}
+                            >
+                                <Download className="mr-2 h-4 w-4" />
+                                Download
+                            </Button>
+                        )}
+                    </div>
                 </div>
               </CardHeader>
               {material.summary && (

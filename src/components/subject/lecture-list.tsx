@@ -1,3 +1,4 @@
+
 "use client";
 import React, { useState } from "react";
 import type { Content } from "@/lib/types";
@@ -40,16 +41,21 @@ export function LectureList({ initialLectures, subjectId, chapterId }: LectureLi
   const router = useRouter();
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-  const handleDownload = (content: string, fileName: string) => {
-    const blob = new Blob([content], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
+  const handleDownload = (content: string, fileName: string, isDataUri = false) => {
     const a = document.createElement("a");
-    a.href = url;
+    if (isDataUri) {
+        a.href = content;
+    } else {
+        const blob = new Blob([content], { type: "text/plain" });
+        a.href = URL.createObjectURL(blob);
+    }
     a.download = fileName;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    if (!isDataUri) {
+        URL.revokeObjectURL(a.href);
+    }
   };
 
   const updateLectureInState = (lectureId: string, updatedProps: Partial<Content>) => {
@@ -62,7 +68,13 @@ export function LectureList({ initialLectures, subjectId, chapterId }: LectureLi
             if (chapter.id === chapterId) {
                 const lectureIndex = chapter.lectures.findIndex((l: any) => l.id === lectureId);
                 if(lectureIndex !== -1) {
-                    chapter.lectures[lectureIndex] = { ...chapter.lectures[lectureIndex], ...updatedProps };
+                    const currentLecture = chapter.lectures[lectureIndex];
+                    chapter.lectures[lectureIndex] = { ...currentLecture, ...updatedProps };
+                    // If we update dataUri, we might not need the URL object anymore
+                    if (updatedProps.dataUri && currentLecture.url.startsWith('blob:')) {
+                        URL.revokeObjectURL(currentLecture.url);
+                        chapter.lectures[lectureIndex].url = '#'; // Or some placeholder
+                    }
                     return true;
                 }
             }
@@ -76,6 +88,7 @@ export function LectureList({ initialLectures, subjectId, chapterId }: LectureLi
     findAndupdate(allSubjects[subjectIndex].chapters);
     updateSubjectData(allSubjects);
     setLectures(prev => prev.map(l => l.id === lectureId ? { ...l, ...updatedProps } : l));
+    router.refresh();
   };
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -90,7 +103,7 @@ export function LectureList({ initialLectures, subjectId, chapterId }: LectureLi
         id: `lec-${Date.now()}`,
         title: file.name,
         type: fileType,
-        url: URL.createObjectURL(file),
+        url: '#', // Not using blob url anymore for persistence
         dataUri: dataUri,
       };
       
@@ -113,10 +126,11 @@ export function LectureList({ initialLectures, subjectId, chapterId }: LectureLi
       findAndAdd(allSubjects[subjectIndex].chapters)
       updateSubjectData(allSubjects)
       setLectures((prev) => [...prev, newLecture]);
+      router.refresh();
 
       toast({
         title: "Lecture Uploaded",
-        description: `"${file.name}" has been added.`,
+        description: `"${file.name}" has been added and saved for offline access.`,
       });
     };
     reader.readAsDataURL(file);
@@ -200,28 +214,40 @@ export function LectureList({ initialLectures, subjectId, chapterId }: LectureLi
                     {lecture.type === "video" ? <Video className="h-6 w-6 text-primary"/> : <Mic className="h-6 w-6 text-primary"/>}
                     <CardTitle>{lecture.title}</CardTitle>
                   </div>
-                  {isTeacher && lecture.dataUri && (
                     <div className="flex gap-2 flex-shrink-0">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleSummarize(lecture.id, lecture.dataUri!)}
-                        disabled={!!loadingStates[lecture.id]}
-                      >
-                        {loadingStates[lecture.id] === 'summarize' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-                        Summarize
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleTranscribe(lecture.id, lecture.dataUri!)}
-                        disabled={!!loadingStates[lecture.id]}
-                      >
-                       {loadingStates[lecture.id] === 'transcribe' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
-                        Transcribe
-                      </Button>
+                      {isTeacher && lecture.dataUri && (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleSummarize(lecture.id, lecture.dataUri!)}
+                            disabled={!!loadingStates[lecture.id]}
+                          >
+                            {loadingStates[lecture.id] === 'summarize' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+                            Summarize
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleTranscribe(lecture.id, lecture.dataUri!)}
+                            disabled={!!loadingStates[lecture.id]}
+                          >
+                          {loadingStates[lecture.id] === 'transcribe' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
+                            Transcribe
+                          </Button>
+                        </>
+                      )}
+                      {lecture.dataUri && (
+                         <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleDownload(lecture.dataUri!, lecture.title, true)}
+                         >
+                            <Download className="mr-2 h-4 w-4" />
+                            Download
+                         </Button>
+                      )}
                     </div>
-                  )}
                 </div>
               </CardHeader>
               {(lecture.summary || lecture.transcription) && (

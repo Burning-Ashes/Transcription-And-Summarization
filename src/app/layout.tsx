@@ -1,7 +1,7 @@
 
 import type { Metadata } from "next";
 import "./globals.css";
-import { UserProvider } from "@/hooks/use-user";
+import { UserProvider } from "@/hooks/use-user.tsx";
 import { Toaster } from "@/components/ui/toaster";
 
 export const metadata: Metadata = {
